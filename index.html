@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SISTEMA CDL ALARES FORTALEZA - V.ESTOQUE</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root { 
+            --blue-alares: #00a1ff; --dark-gray: #1e222b; --green: #22c55e; --red: #ef4444; --orange: #f59e0b;
+            --light-bg: #f4f7f9; --card-bg: #ffffff; --text-main: #333333; --border-color: #e2e8f0;
+        }
+        body.dark-mode { --light-bg: #111319; --card-bg: #1e212a; --text-main: #e2e8f0; --border-color: #2d313d; --dark-gray: #000000; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--light-bg); margin: 0; color: var(--text-main); transition: 0.3s; }
+        
+        .header-top { background: var(--dark-gray); color: white; padding: 12px 25px; display: flex; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .logo-alares { font-weight: 900; font-size: 24px; color: var(--blue-alares); }
+        .nav-tabs { background: var(--card-bg); display: flex; padding: 0 20px; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
+        .tab { padding: 18px 20px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 700; color: #888; text-transform: uppercase; font-size: 11px; }
+        .tab.active { border-bottom: 3px solid var(--blue-alares); color: var(--blue-alares); background: rgba(0, 161, 255, 0.05); }
+
+        .container { max-width: 1450px; margin: 20px auto; padding: 0 20px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .resumo-dia { background: var(--blue-alares); color: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        input, select, textarea { width: 100%; padding: 12px; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; outline: none; box-sizing: border-box; }
+        
+        .btn-main { background: var(--blue-alares); color: white; border: none; padding: 16px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; text-transform: uppercase; }
+        .btn-add { background: var(--green); margin: 0; padding: 10px; width: 80px; }
+        .btn-del { background: var(--red); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .btn-excel { background: #1d6f42; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        .btn-danger-zone { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 11px; width: 100%; margin-top: 20px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px; font-size: 10px; color: #888; border-bottom: 2px solid var(--border-color); background: rgba(0,0,0,0.02); }
+        td { padding: 10px; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+        .scroll-lista { max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; }
+
+        #cupom { display: none; background: #fff; color: #000; padding: 20px; border: 1px solid #000; font-family: 'Courier New', monospace; width: 280px; margin: 0 auto 20px; border-top: 8px solid var(--blue-alares); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .badge-entrada { background: var(--green); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .badge-saida { background: var(--orange); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="header-top">
+    <span class="logo-alares">alares</span>
+    <button style="margin-left:auto; background:#333; color:#fff; border:none; padding:8px; border-radius:5px; cursor:pointer;" onclick="document.body.classList.toggle('dark-mode')">🌙 TEMA</button>
+</div>
+
+<div class="nav-tabs">
+    <div class="tab active" onclick="abrirAba(event, 'movimentar')">Movimentar</div>
+    <div class="tab" onclick="abrirAba(event, 'historico')">Histórico Geral</div>
+    <div class="tab" onclick="abrirAba(event, 'entradas')">📥 Entradas Estoque</div>
+    <div class="tab" onclick="abrirAba(event, 'saidas')">📤 Saídas Técnicos</div>
+    <div class="tab" onclick="abrirAba(event, 'ajustes')">Ajustes</div>
+</div>
+
+<div class="container">
+    <div id="cupom">
+        <div style="text-align:center; font-weight:bold; border-bottom:1px dashed #000; padding-bottom:10px; margin-bottom:10px;">ALARES LOGÍSTICA</div>
+        <div id="cupomConteudo" style="font-size:12px; line-height:1.5;"></div>
+        <button class="btn-main" style="padding:5px; font-size:10px; margin-top:10px;" onclick="this.parentElement.style.display='none'">FECHAR</button>
+    </div>
+
+    <div id="movimentar" class="tab-content active">
+        <div class="resumo-dia">
+            <span>PRODUÇÃO DE HOJE:</span>
+            <span id="prodHoje" style="font-size:30px; font-weight:900;">0</span>
+        </div>
+        <div class="card">
+            <div class="grid">
+                <div><label>Nº TR</label><input type="text" id="tr" onkeydown="pular(event, 'de')"></div>
+                <div><label>Origem</label><input type="text" id="de" list="lista-nomes" onkeydown="pular(event, 'para')"></div>
+                <div><label>Destino</label><input type="text" id="para" list="lista-nomes" onkeydown="pular(event, 'conf')"></div>
+                <div><label>Conferente</label><input type="text" id="conf" onkeydown="pular(event, 'massa')"></div>
+            </div>
+            <textarea id="massa" rows="6" placeholder="BIPE O LOTE AQUI (CÓDIGO SERIAL)"></textarea>
+            <button class="btn-main" style="margin-top:15px;" onclick="salvar()">FINALIZAR REGISTRO</button>
+        </div>
+    </div>
+
+    <div id="historico" class="tab-content">
+        <div class="card">
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px;">
+                <h2 style="margin:0; font-size:14px; color:var(--blue-alares);">HISTÓRICO COMPLETO</h2>
+                <button class="btn-excel" onclick="exportarExcel('geral')">📊 EXPORTAR GERAL</button>
+            </div>
+            <input type="text" id="buscaHist" placeholder="🔍 Buscar..." oninput="renderHist()" style="margin-bottom: 10px;">
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead><tr><th>TR</th><th>DATA</th><th>SERIAL</th><th>MODELO</th><th>FLUXO</th></tr></thead>
+                    <tbody id="corpoHist"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="entradas" class="tab-content">
+        <div class="card">
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px;">
+                <h2 style="margin:0; font-size:14px; color:var(--green);">📥 ENTRADAS NO ESTOQUE (RETORNO/PRINCIPAL)</h2>
+                <button class="btn-excel" onclick="exportarExcel('entradas')">📊 EXPORTAR ENTRADAS</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead><tr><th>TR</th><th>DATA</th><th>SERIAL</th><th>MODELO</th><th>ORIGEM</th></tr></thead>
+                    <tbody id="corpoEntradas"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="saidas" class="tab-content">
+        <div class="card">
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px;">
+                <h2 style="margin:0; font-size:14px; color:var(--orange);">📤 SAÍDAS PARA TÉCNICOS / EMPREITEIRAS</h2>
+                <button class="btn-excel" onclick="exportarExcel('saidas')">📊 EXPORTAR SAÍDAS</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead><tr><th>TR</th><th>DATA</th><th>SERIAL</th><th>MODELO</th><th>DESTINO</th></tr></thead>
+                    <tbody id="corpoSaidas"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="ajustes" class="tab-content">
+        <div class="grid">
+            <div class="card">
+                <h3>👥 Técnicos / Locais</h3>
+                <div style="display:flex; gap:5px;"><input type="text" id="novoNome" placeholder="Novo nome..."><button class="btn-main btn-add" onclick="addAjuste('nomes')">ADD</button></div>
+                <div class="scroll-lista"><table><tbody id="listaNomesVis"></tbody></table></div>
+            </div>
+            <div class="card">
+                <h3>📦 Modelos</h3>
+                <div style="display:grid; grid-template-columns: 80px 1fr 60px; gap:5px; margin-bottom:10px;">
+                    <input type="text" id="novoCod" placeholder="Cód"><input type="text" id="novoDesc" placeholder="Modelo"><button class="btn-main btn-add" onclick="addAjuste('modelos')">ADD</button>
+                </div>
+                <textarea id="massaModelos" rows="3" placeholder="Cadastro em massa: CÓDIGO DESCRIÇÃO"></textarea>
+                <button class="btn-main" style="padding:8px; font-size:11px; margin-top:5px; background:var(--green);" onclick="salvarModelosMassa()">CADASTRAR LISTA</button>
+                <div class="scroll-lista"><table><tbody id="listaModVis"></tbody></table></div>
+                <button class="btn-danger-zone" onclick="limparBancoTotal()" style="background:none; color:red; border:1px solid red; width:100%; margin-top:10px; cursor:pointer; padding:5px; border-radius:5px;">⚠️ LIMPAR TUDO</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<datalist id="lista-nomes"></datalist>
+
+<script>
+    let db_hist = JSON.parse(localStorage.getItem('alares_h_v27')) || [];
+    let db_mod = JSON.parse(localStorage.getItem('alares_m_v27')) || {"5040": "ONT INTELBRAS"};
+    let db_nomes = JSON.parse(localStorage.getItem('alares_n_v27')) || ["ESTOQUE CDL", "ALMOXARIFADO"];
+
+    function tocar(s) {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = s === 'ok' ? 880 : 220;
+        g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.1);
+        o.start(); o.stop(ctx.currentTime + 0.1);
+    }
+
+    function abrirAba(e, n) {
+        document.querySelectorAll('.tab-content, .tab').forEach(el => el.classList.remove('active'));
+        document.getElementById(n).classList.add('active'); e.currentTarget.classList.add('active');
+        if(n === 'historico') renderHist();
+        if(n === 'entradas') renderEntradas();
+        if(n === 'saidas') renderSaidas();
+        if(n === 'ajustes') renderListasAjustes();
+    }
+
+    function salvar() {
+        const tr = document.getElementById('tr').value.trim();
+        const txt = document.getElementById('massa').value.trim();
+        const de = document.getElementById('de').value.toUpperCase();
+        const para = document.getElementById('para').value.toUpperCase();
+        if(!tr || !txt || !de || !para) return alert("Preencha todos os campos!");
+        
+        const linhas = txt.split('\n');
+        linhas.forEach(l => {
+            const p = l.trim().split(/\s+/);
+            if(p.length >= 2) {
+                const cod = p[0].toUpperCase();
+                db_hist.unshift({
+                    id: Date.now()+Math.random(), tr: tr.toUpperCase(), 
+                    data: new Date().toLocaleString(), dia: new Date().toLocaleDateString(), 
+                    sn: p.slice(1).join(' ').toUpperCase(), cod, 
+                    mod: db_mod[cod] || cod, de, para
+                });
+            }
+        });
+        localStorage.setItem('alares_h_v27', JSON.stringify(db_hist));
+        tocar('ok');
+        document.getElementById('cupom').style.display = 'block';
+        document.getElementById('cupomConteudo').innerHTML = `TR: ${tr}<br>ITENS: ${linhas.length}<br>DESTINO: ${para}<br>${new Date().toLocaleString()}`;
+        document.getElementById('massa').value = ""; document.getElementById('tr').value = "";
+        atualizarProdCount();
+    }
+
+    function renderHist() {
+        const t = document.getElementById('buscaHist').value.toUpperCase();
+        const f = db_hist.filter(i => i.tr.includes(t) || i.sn.includes(t) || i.mod.includes(t));
+        document.getElementById('corpoHist').innerHTML = f.slice(0, 50).map(i => `<tr><td>${i.tr}</td><td><small>${i.data}</small></td><td><b>${i.sn}</b></td><td>${i.mod}</td><td><small>${i.de}➔${i.para}</small></td></tr>`).join('');
+    }
+
+    function renderEntradas() {
+        // Filtra o que entrou no Estoque CDL ou Almoxarifado
+        const f = db_hist.filter(i => i.para === "ESTOQUE CDL" || i.para === "ALMOXARIFADO");
+        document.getElementById('corpoEntradas').innerHTML = f.slice(0, 100).map(i => `<tr><td>${i.tr}</td><td><small>${i.data}</small></td><td><b>${i.sn}</b></td><td>${i.mod}</td><td><span class="badge-entrada">${i.de}</span></td></tr>`).join('');
+    }
+
+    function renderSaidas() {
+        // Filtra o que saiu para qualquer lugar que NÃO seja estoque
+        const f = db_hist.filter(i => i.para !== "ESTOQUE CDL" && i.para !== "ALMOXARIFADO");
+        document.getElementById('corpoSaidas').innerHTML = f.slice(0, 100).map(i => `<tr><td>${i.tr}</td><td><small>${i.data}</small></td><td><b>${i.sn}</b></td><td>${i.mod}</td><td><span class="badge-saida">${i.para}</span></td></tr>`).join('');
+    }
+
+    function exportarExcel(tipo) {
+        let dados = db_hist;
+        if(tipo === 'entradas') dados = db_hist.filter(i => i.para === "ESTOQUE CDL" || i.para === "ALMOXARIFADO");
+        if(tipo === 'saidas') dados = db_hist.filter(i => i.para !== "ESTOQUE CDL" && i.para !== "ALMOXARIFADO");
+        
+        const ws = XLSX.utils.json_to_sheet(dados.map(i => ({ "TR": i.tr, "DATA": i.data, "SERIAL": i.sn, "MODELO": i.mod, "ORIGEM": i.de, "DESTINO": i.para })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Relatorio");
+        XLSX.writeFile(wb, `ALARES_${tipo.toUpperCase()}_${new Date().toLocaleDateString()}.xlsx`);
+    }
+
+    function salvarModelosMassa() {
+        const txt = document.getElementById('massaModelos').value.trim();
+        if(!txt) return;
+        txt.split('\n').forEach(l => {
+            const p = l.trim().split(/\s+/);
+            if(p.length >= 2) db_mod[p[0].toUpperCase()] = p.slice(1).join(' ').toUpperCase();
+        });
+        localStorage.setItem('alares_m_v27', JSON.stringify(db_mod));
+        renderListasAjustes(); document.getElementById('massaModelos').value = ""; alert("Lista atualizada!");
+    }
+
+    function addAjuste(tipo) {
+        if(tipo === 'nomes') {
+            const v = document.getElementById('novoNome').value.trim().toUpperCase();
+            if(v) { db_nomes.push(v); db_nomes.sort(); localStorage.setItem('alares_n_v27', JSON.stringify(db_nomes)); }
+            document.getElementById('novoNome').value = "";
+        } else {
+            const c = document.getElementById('novoCod').value.trim().toUpperCase();
+            const d = document.getElementById('novoDesc').value.trim().toUpperCase();
+            if(c && d) { db_mod[c] = d; localStorage.setItem('alares_m_v27', JSON.stringify(db_mod)); }
+            document.getElementById('novoCod').value = ""; document.getElementById('novoDesc').value = "";
+        }
+        renderListasAjustes(); atualizarDatalist();
+    }
+
+    function delAjuste(t, r) { if(confirm("Excluir?")) { if(t === 'nomes') db_nomes = db_nomes.filter(n => n !== r); else delete db_mod[r]; localStorage.setItem('alares_n_v27', JSON.stringify(db_nomes)); localStorage.setItem('alares_m_v27', JSON.stringify(db_mod)); renderListasAjustes(); atualizarDatalist(); } }
+    function renderListasAjustes() { document.getElementById('listaNomesVis').innerHTML = db_nomes.map(n => `<tr><td>${n}</td><td width="40"><button class="btn-del" onclick="delAjuste('nomes','${n}')">X</button></td></tr>`).join(''); let h = ""; for(let k in db_mod) h += `<tr><td><b>${k}</b></td><td>${db_mod[k]}</td><td><button class="btn-del" onclick="delAjuste('modelos','${k}')">X</button></td></tr>`; document.getElementById('listaModVis').innerHTML = h; }
+    function pular(e, id) { if(e.key === "Enter") { e.preventDefault(); document.getElementById(id).focus(); } }
+    function atualizarDatalist() { document.getElementById('lista-nomes').innerHTML = db_nomes.map(n => `<option value="${n}">`).join(''); }
+    function atualizarProdCount() { document.getElementById('prodHoje').innerText = db_hist.filter(i => i.dia === new Date().toLocaleDateString()).length; }
+    function limparBancoTotal() { if(confirm("Apagar histórico?")) { db_hist = []; localStorage.setItem('alares_h_v27', JSON.stringify(db_hist)); location.reload(); } }
+    window.onload = () => { atualizarDatalist(); atualizarProdCount(); };
+</script>
+</body>
+</html>
