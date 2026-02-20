@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>SISTEMA CDL ALARES FORTALEZA - V.ESTOQUE</title>
+    <title>SISTEMA CDL ALARES FORTALEZA - V.ESTOQUE PRO</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -32,7 +32,8 @@
         .btn-add { background: var(--green); margin: 0; padding: 10px; width: 80px; }
         .btn-del { background: var(--red); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .btn-excel { background: #1d6f42; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .btn-danger-zone { background: transparent; color: var(--red); border: 1px solid var(--red); padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 11px; width: 100%; margin-top: 20px; }
+        
+        .btn-bkp { background: #6366f1; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 11px; width: 100%; margin-bottom: 10px; }
 
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 12px; font-size: 10px; color: #888; border-bottom: 2px solid var(--border-color); background: rgba(0,0,0,0.02); }
@@ -135,6 +136,14 @@
                 <h3>👥 Técnicos / Locais</h3>
                 <div style="display:flex; gap:5px;"><input type="text" id="novoNome" placeholder="Novo nome..."><button class="btn-main btn-add" onclick="addAjuste('nomes')">ADD</button></div>
                 <div class="scroll-lista"><table><tbody id="listaNomesVis"></tbody></table></div>
+                
+                <h3 style="margin-top:20px; border-top: 1px solid var(--border-color); padding-top: 15px;">💾 Segurança do Sistema</h3>
+                <button class="btn-bkp" onclick="fazerBackup()">📥 GERAR BACKUP DO SISTEMA</button>
+                <label class="btn-bkp" style="display:block; text-align:center; background:#475569; cursor:pointer;">
+                    📤 RESTAURAR BACKUP
+                    <input type="file" id="importBkp" style="display:none" onchange="restaurarBackup(event)">
+                </label>
+                <p style="font-size:10px; color:#888;">*O backup salva histórico, técnicos e modelos em um arquivo.</p>
             </div>
             <div class="card">
                 <h3>📦 Modelos</h3>
@@ -144,7 +153,7 @@
                 <textarea id="massaModelos" rows="3" placeholder="Cadastro em massa: CÓDIGO DESCRIÇÃO"></textarea>
                 <button class="btn-main" style="padding:8px; font-size:11px; margin-top:5px; background:var(--green);" onclick="salvarModelosMassa()">CADASTRAR LISTA</button>
                 <div class="scroll-lista"><table><tbody id="listaModVis"></tbody></table></div>
-                <button class="btn-danger-zone" onclick="limparBancoTotal()" style="background:none; color:red; border:1px solid red; width:100%; margin-top:10px; cursor:pointer; padding:5px; border-radius:5px;">⚠️ LIMPAR TUDO</button>
+                <button class="btn-danger-zone" onclick="limparBancoTotal()" style="background:none; color:red; border:1px solid red; width:100%; margin-top:10px; cursor:pointer; padding:5px; border-radius:5px;">⚠️ LIMPAR HISTÓRICO TOTAL</button>
             </div>
         </div>
     </div>
@@ -165,6 +174,41 @@
         g.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.1);
         o.start(); o.stop(ctx.currentTime + 0.1);
     }
+
+    // --- FUNÇÕES DE BACKUP ---
+    function fazerBackup() {
+        const dados = {
+            historico: db_hist,
+            modelos: db_mod,
+            nomes: db_nomes,
+            versao: "v27"
+        };
+        const blob = new Blob([JSON.stringify(dados)], {type: 'application/json'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `BACKUP_SISTEMA_ALARES_${new Date().toLocaleDateString()}.json`;
+        link.click();
+    }
+
+    function restaurarBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const dados = JSON.parse(e.target.result);
+                if(confirm("Isso irá substituir seus dados atuais. Continuar?")) {
+                    localStorage.setItem('alares_h_v27', JSON.stringify(dados.historico));
+                    localStorage.setItem('alares_m_v27', JSON.stringify(dados.modelos));
+                    localStorage.setItem('alares_n_v27', JSON.stringify(dados.nomes));
+                    alert("Backup restaurado com sucesso! O sistema irá reiniciar.");
+                    location.reload();
+                }
+            } catch (err) { alert("Arquivo de backup inválido."); }
+        };
+        reader.readAsText(file);
+    }
+    // ------------------------
 
     function abrirAba(e, n) {
         document.querySelectorAll('.tab-content, .tab').forEach(el => el.classList.remove('active'));
@@ -210,13 +254,11 @@
     }
 
     function renderEntradas() {
-        // Filtra o que entrou no Estoque CDL ou Almoxarifado
         const f = db_hist.filter(i => i.para === "ESTOQUE CDL" || i.para === "ALMOXARIFADO");
         document.getElementById('corpoEntradas').innerHTML = f.slice(0, 100).map(i => `<tr><td>${i.tr}</td><td><small>${i.data}</small></td><td><b>${i.sn}</b></td><td>${i.mod}</td><td><span class="badge-entrada">${i.de}</span></td></tr>`).join('');
     }
 
     function renderSaidas() {
-        // Filtra o que saiu para qualquer lugar que NÃO seja estoque
         const f = db_hist.filter(i => i.para !== "ESTOQUE CDL" && i.para !== "ALMOXARIFADO");
         document.getElementById('corpoSaidas').innerHTML = f.slice(0, 100).map(i => `<tr><td>${i.tr}</td><td><small>${i.data}</small></td><td><b>${i.sn}</b></td><td>${i.mod}</td><td><span class="badge-saida">${i.para}</span></td></tr>`).join('');
     }
@@ -225,7 +267,6 @@
         let dados = db_hist;
         if(tipo === 'entradas') dados = db_hist.filter(i => i.para === "ESTOQUE CDL" || i.para === "ALMOXARIFADO");
         if(tipo === 'saidas') dados = db_hist.filter(i => i.para !== "ESTOQUE CDL" && i.para !== "ALMOXARIFADO");
-        
         const ws = XLSX.utils.json_to_sheet(dados.map(i => ({ "TR": i.tr, "DATA": i.data, "SERIAL": i.sn, "MODELO": i.mod, "ORIGEM": i.de, "DESTINO": i.para })));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Relatorio");
